@@ -54,17 +54,17 @@ live = (6, 8)
 
 If mysqlmerge is ran on those two data sets, using command:
 
-mysqlmerge dev live
+`mysqlmerge dev live`
 
 The live data set becomes `(6, 8, 1, 2, 3, 4)`. Now what ever was in dev, is now in live!
 
-* some more command line examples:
-mysqlmerge dev live
-mysqlmerge -i /path/to/dev.sql /path/to/live.sql
-mysqlmerge dev live > live_sql_update.sql
+Some more command line examples:
 
+`mysqlmerge dev live`
+`mysqlmerge -i /path/to/dev.sql /path/to/live.sql`
+`mysqlmerge dev live > live_sql_update.sql`
 
-* Usage Report: `mysqlmerge --help`
+Usage Report: `mysqlmerge --help`
 
 ```
 usage: mysqlmerge [-h] [-c] [-d] [-i] [-v] database database

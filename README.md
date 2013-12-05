@@ -63,9 +63,10 @@ mysqlmerge dev live
 mysqlmerge -i /path/to/dev.sql /path/to/live.sql
 mysqlmerge dev live > live_sql_update.sql
 
-```
-Usage Report: mysqlmerge --help
 
+* Usage Report: `mysqlmerge --help`
+
+```
 usage: mysqlmerge [-h] [-c] [-d] [-i] [-v] database database
 
 MySQL Merge -- merges table structures across different databases.

@@ -61,7 +61,9 @@ The live data set becomes `(6, 8, 1, 2, 3, 4)`. Now what ever was in dev, is now
 Some more command line examples:
 
 `mysqlmerge dev live`
+
 `mysqlmerge -i /path/to/dev.sql /path/to/live.sql`
+
 `mysqlmerge dev live > live_sql_update.sql`
 
 Usage Report: `mysqlmerge --help`

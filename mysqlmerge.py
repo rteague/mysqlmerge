@@ -105,7 +105,7 @@ def diff_databases(db1, db2):
 	for table,attr in db1.items():
 		# check if we've spotted a difference in tables
 		diffs['tables'][table] = {}
-		diffs['tables'][table]['add'] = [];  diffs['tables'][table]['mod']  = []
+		diffs['tables'][table]['add'] = [];  diffs['tables'][table]['modify']  = []
 		diffs['tables'][table]['drop'] = []; diffs['tables'][table]['indices'] = []
 		diffs['tables'][table]['table'] = [] # anything using CREATE TABLE statement
 		if not db2.has_key(table):
@@ -116,7 +116,7 @@ def diff_databases(db1, db2):
 				if val['index']:
 					desc = re.sub(re.compile("unique", re.I), "UNIQUE INDEX", re.sub(re.compile("key", re.I), "INDEX", val['description']))
 					if not db2[table]['fields'].has_key(field):
-						diffs['tables'][table]['indices'].append('ALTER TABLE `%s` ADD %s' % (table, desc))
+						diffs['tables'][table]['indices'].append('ALTER TABLE `%s` ADD %s;' % (table, desc))
 						diffs['adds'] += 1
 					else:
 						if val['description'] != db2[table]['fields'][field]['description']:
@@ -128,7 +128,7 @@ def diff_databases(db1, db2):
 						diffs['adds'] += 1
 					else:
 						if val['description'] != db2[table]['fields'][field]['description']:
-							diffs['tables'][table]['mod'].append(val['description'])
+							diffs['tables'][table]['modify'].append(val['description'])
 							diffs['mods'] += 1
 				# add drops anyway -- but in this early version, we are not going to allow drops
 				diffs['tables'][table]['drop'] = []
@@ -136,7 +136,7 @@ def diff_databases(db1, db2):
 
 def write_table_actions(table, action, data):
 	data_len = len(data[action])
-	sql_action_keyword = action.upper().replace('MOD', 'MODIFY')
+	sql_action_keyword = action.upper()
 	if data_len > 0:
 		if action == 'index' or action == 'indices' or action == 'table':
 			for i in xrange(0, data_len): print data[action][i]
@@ -153,11 +153,11 @@ def write_table_actions(table, action, data):
 def write_sql(diffs):
 	print '\n-- Additions %d, Modifications %d, Drops %d; across all tables' % (diffs['adds'], diffs['mods'], diffs['drops']),
 	for table,tdata in diffs['tables'].items():
-		if len(diffs['tables'][table]['add']) > 0 or len(diffs['tables'][table]['mod']) > 0 \
+		if len(diffs['tables'][table]['add']) > 0 or len(diffs['tables'][table]['modify']) > 0 \
 			or len(diffs['tables'][table]['drop']) > 0 or len(diffs['tables'][table]['indices']) \
 			or len(diffs['tables'][table]['table']) > 0:
 			print '\n-- column and index field changes for table `%s`' % table
-		write_table_actions(table, 'add', diffs['tables'][table]); write_table_actions(table, 'mod', diffs['tables'][table])
+		write_table_actions(table, 'add', diffs['tables'][table]); write_table_actions(table, 'modify', diffs['tables'][table])
 		write_table_actions(table, 'drop', diffs['tables'][table]); write_table_actions(table, 'indices', diffs['tables'][table])
 		write_table_actions(table, 'table', diffs['tables'][table])
 

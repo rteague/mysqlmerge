@@ -168,7 +168,7 @@ def merge(databases = None, input_files = False, drop_diff = False, verbose = Fa
 		
 		program_desc = "MySQL Merge -- merges table structures across different databases.\n"
 		parser = argparse.ArgumentParser(prog = 'mysqlmerge', description = program_desc,
-											epilog = 'MySQL Merge v%s Copyright (c) %s Pear' % (MYSQLMERGE_VERSION, time.strftime('%Y')))
+											epilog = 'MySQL Merge v%s Copyright (c) %s Rashaud Teague' % (MYSQLMERGE_VERSION, time.strftime('%Y')))
 		parser.add_argument('database', nargs = 2, help = 'database to merge')
 		parser.add_argument('-c', '--commit-merge', action = 'store_true', help = 'runs the generated sql against database2 -- NOT YET IMPLEMENTED!!!')
 		parser.add_argument('-d', '--drop-diff', action = 'store_true', help = 'drop differences (fields) -- NOT YET IMPLEMENTED!!!')

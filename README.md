@@ -4,26 +4,22 @@
 ### Requirements
 
 * Python 2.7.*
-* mysqldump
 * mysql.connector
 * mdb.abstract
 * Mac OSX or Linux... get that Windows stuff outta herrr
-
 
 ### License
 
 * LGPL, the LICENSE.txt file found in the package.
 
-
 ### Installation
 
-* Within the mysqlmerge package directory run: sudo ./install.sh
+* Within the mysqlmerge package directory run: `sudo ./install.sh`
 * This just moves the mysqlmerge.py file to the machine's /usr/bin directory (/usr/bin/mysqlmerge)
-
 
 ### Uninstallation
 
-* Within the mysqlmerge package directory run: sudo ./uninstall.sh
+* Within the mysqlmerge package directory run: `sudo ./uninstall.sh`
 
 ### How to
 
@@ -68,7 +64,7 @@ Some more command line examples:
 
 Usage Report: `mysqlmerge --help`
 
-```
+```bash
 usage: mysqlmerge [-h] [-c] [-d] [-i] [-v] database database
 
 MySQL Merge -- merges table structures across different databases.

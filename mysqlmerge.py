@@ -7,9 +7,7 @@
 ##
 
 import argparse, re, sys, subprocess, os, os.path, xml.etree.ElementTree as ET, time
-import mysql.connector
-from mysql.connector import errorcode
-from mysql.connector import conversion
+import mdb.abstract
 
 MYSQLMERGE_VERSION = '0.0.1'
 MYSQLMERGE_CONFIG_PATH = '%s/.mysqlmerge' % os.environ['HOME']
@@ -42,17 +40,14 @@ def parse_db_config(path):
 
 def get_mysqldumped_contents(database):
 	dbinfo = parse_db_config('%s/databases/%s.xml' % (MYSQLMERGE_CONFIG_PATH, database))
-	# run mysqldump in subprocess.check_output
-	cmd = ['mysqldump', '-d', '-h', dbinfo['host'], '-u', dbinfo['user'], '-p%s' % dbinfo['password'], dbinfo['name']]
-	sql_contents = None
-	try:
-		sql_contents = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
-	except subprocess.CalledProcessError as e:
-		error('mysqlmerge: subprocess.check_output: %s; error: %s' % (' '.join(e.cmd), e.output))
-	except OSError as e:
-		if str(e) == '[Errno 2] No such file or directory':
-			error('mysqlmerge: \'mysqldump\' command not found')
-		error(str(e))
+	db = mdb.abstract.Abstract(host = dbinfo['host'], user = dbinfo['user'], password = dbinfo['password'], database = dbinfo['name'])
+	db.connect()
+	sql_contents = ''
+	tables = db.fetch_all("show tables")
+	for table in tables:
+		table_create = db.fetch_row("show create table %s" % table['Tables_in_%s' % db.database()])
+		sql_contents = '%s%s;\n\n' % (sql_contents, table_create['Create Table'])
+	db.close()
 	return sql_contents
 
 def parse_sql(contents):

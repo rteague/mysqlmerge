@@ -88,7 +88,7 @@ def parse_sql(contents):
 		fields = re.split(",\n", tsd[2])
 		tables[tsd[1]] = {}
 		tables[tsd[1]]['definition'] = tsd[0]
-		tables[tsd[1]]['fields'] = {}
+		tables[tsd[1]]['fields']     = {}
 		for field in fields:
 			column     = get_column_field(field.strip())
 			index      = get_index_field(field.strip())
@@ -96,20 +96,20 @@ def parse_sql(contents):
 			if column:
 				tables[tsd[1]]['fields'][column[1]] = {}
 				tables[tsd[1]]['fields'][column[1]]['description'] = column[0]
-				tables[tsd[1]]['fields'][column[1]]['name'] = column[1]
+				tables[tsd[1]]['fields'][column[1]]['name']        = column[1]
 			elif index:
 				index_type = index[1].lower().replace(' ' , '_')
 				index_field_alias_name = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
 				index_field_name = '%s' % index[2] if index[2] else '%s' % index[3]
 				tables[tsd[1]]['fields'][index_field_alias_name] = {}
 				tables[tsd[1]]['fields'][index_field_alias_name]['description'] = index[0]
-				tables[tsd[1]]['fields'][index_field_alias_name]['name'] = index_field_name
-				tables[tsd[1]]['fields'][index_field_alias_name]['index'] = index[1].lower()
+				tables[tsd[1]]['fields'][index_field_alias_name]['name']        = index_field_name
+				tables[tsd[1]]['fields'][index_field_alias_name]['index']       = index[1].lower()
 			elif constraint:
-				tables[tsd[1]]['fields'][column[1]] = {}
-				tables[tsd[1]]['fields'][column[1]]['description'] = column[0]
-				tables[tsd[1]]['fields'][column[1]]['name'] = column[1]
-				tables[tsd[1]]['fields'][column[1]]['constraint'] = None
+				tables[tsd[1]]['fields'][constraint[1]] = {}
+				tables[tsd[1]]['fields'][constraint[1]]['description'] = constraint[0]
+				tables[tsd[1]]['fields'][constraint[1]]['name']        = constraint[1]
+				tables[tsd[1]]['fields'][constraint[1]]['constraint']  = constraint[1]
 	return tables
 
 def diff_databases(db1, db2):
@@ -120,9 +120,9 @@ def diff_databases(db1, db2):
 	for table,attr in db1.items():
 		# check if we've spotted a difference in tables
 		diffs['tables'][table] = {}
-		diffs['tables'][table]['add'] = [];  diffs['tables'][table]['modify']  = []
-		diffs['tables'][table]['drop'] = []; diffs['tables'][table]['indices'] = []
-		diffs['tables'][table]['table'] = [] # anything using CREATE TABLE statement
+		diffs['tables'][table]['add']   = []; diffs['tables'][table]['modify']      = []
+		diffs['tables'][table]['drop']  = []; diffs['tables'][table]['indices']     = []
+		diffs['tables'][table]['table'] = []; diffs['tables'][table]['constraints'] = []
 		if not db2.has_key(table):
 			diffs['tables'][table]['table'].append(attr['definition'])
 		else:
@@ -138,7 +138,13 @@ def diff_databases(db1, db2):
 							diffs['tables'][table]['indices'].append('ALTER TABLE `%s` DROP INDEX `%s`; ALTER TABLE `%s` ADD %s;' % (table, val['name'], table, desc))
 							diffs['mods'] += 1
 				elif 'constraint' in val:
-					pass
+					if not db2[table]['fields'].has_key(field):
+						diffs['tables'][table]['constraints'].append('ALTER TABLE `%s` ADD %s;' % (table, val['description']))
+						diffs['adds'] += 1
+					else:
+						if val['description'] != db2[table]['fields'][field]['description']:
+							diffs['tables'][table]['constraints'].append('ALTER TABLE `%s` DROP FOREIGN KEY `%s`; ALTER TABLE `%s` ADD %s;' % (table, val['name'], table, val['description']))
+							diffs['mods'] += 1
 				else:
 					if not db2[table]['fields'].has_key(field):
 						diffs['tables'][table]['add'].append(val['description'])
@@ -155,7 +161,7 @@ def write_table_actions(table, action, data):
 	data_len = len(data[action])
 	sql_action_keyword = action.upper()
 	if data_len > 0:
-		if action == 'index' or action == 'indices' or action == 'table':
+		if action == 'index' or action == 'indices' or action == 'table' or action == 'constraints':
 			for i in xrange(0, data_len): print data[action][i]
 		else:
 			print 'ALTER TABLE `%s`' % table,
@@ -168,15 +174,15 @@ def write_table_actions(table, action, data):
 				
 
 def write_sql(diffs):
-	print '\n-- Additions %d, Modifications %d, Drops %d; across all tables' % (diffs['adds'], diffs['mods'], diffs['drops']),
+	print '\n-- Additions %d, Modifications %d, Drops %d; across all tables\n' % (diffs['adds'], diffs['mods'], diffs['drops']),
 	for table,tdata in diffs['tables'].items():
 		if len(diffs['tables'][table]['add']) > 0 or len(diffs['tables'][table]['modify']) > 0 \
 			or len(diffs['tables'][table]['drop']) > 0 or len(diffs['tables'][table]['indices']) \
 			or len(diffs['tables'][table]['table']) > 0:
 			print '\n-- column and index field changes for table `%s`' % table
-		write_table_actions(table, 'add', diffs['tables'][table]); write_table_actions(table, 'modify', diffs['tables'][table])
-		write_table_actions(table, 'drop', diffs['tables'][table]); write_table_actions(table, 'indices', diffs['tables'][table])
-		write_table_actions(table, 'table', diffs['tables'][table])
+		write_table_actions(table, 'add', diffs['tables'][table]);   write_table_actions(table, 'modify', diffs['tables'][table])
+		write_table_actions(table, 'drop', diffs['tables'][table]);  write_table_actions(table, 'indices', diffs['tables'][table])
+		write_table_actions(table, 'table', diffs['tables'][table]); write_table_actions(table, 'constraints', diffs['tables'][table])
 
 def merge(databases = None, input_files = False, drop_diff = False, verbose = False):
 	if __name__ == '__main__':

@@ -50,33 +50,6 @@ def get_mysqldumped_contents(database):
 	db.close()
 	return sql_contents
 
-def parse_sql(contents):
-	table_regex = re.compile("(create table *`([a-z0-9_]+)` *\(\s*([^;]+)\)[^;]+;)", re.I)
-	tables = {}
-	table_structure_data = table_regex.findall(contents)
-	for tsd in table_structure_data:
-		fields = re.split(",\n", tsd[2])
-		tables[tsd[1]] = {}
-		tables[tsd[1]]['definition'] = tsd[0]
-		tables[tsd[1]]['fields'] = {}
-		for field in fields:
-			column = get_column_field(field.strip())
-			index  = get_index_field(field.strip())
-			if column:
-				tables[tsd[1]]['fields'][column[1]] = {}
-				tables[tsd[1]]['fields'][column[1]]['description'] = column[0]
-				tables[tsd[1]]['fields'][column[1]]['name'] = column[1]
-				tables[tsd[1]]['fields'][column[1]]['index'] = None
-			elif index:
-				index_type = index[1].lower().replace(' ' , '_')
-				index_field_alias_name = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
-				index_field_name = '%s' % index[2] if index[2] else '%s' % index[3]
-				tables[tsd[1]]['fields'][index_field_alias_name] = {}
-				tables[tsd[1]]['fields'][index_field_alias_name]['description'] = index[0]
-				tables[tsd[1]]['fields'][index_field_alias_name]['name'] = index_field_name
-				tables[tsd[1]]['fields'][index_field_alias_name]['index'] = index[1].lower()
-	return tables
-
 def get_column_field(field):
 	column_field_regex = re.compile(
 		"^(`([a-z0-9_]+)`"
@@ -97,6 +70,48 @@ def get_index_field(field):
 		return key_field_match.groups()
 	return None
 
+def get_constraint(field):
+	constraint_regex = re.compile(
+		"^(constraint `([a-z_][a-z0-9_]+)` foreign key \(`[a-z_][a-z0-9_]+`\)"
+		" references `[a-z_][a-z0-9_]+` \(`[a-z_][a-z0-9_]+`\)(?: on delete .*)?)$", re.I
+	)
+	constraint_match = constraint_regex.match(field)
+	if constraint_match:
+		return constraint_match.groups()
+	return None
+
+def parse_sql(contents):
+	table_regex = re.compile("(create table *`([a-z0-9_]+)` *\(\s*([^;]+)\)[^;]+;)", re.I)
+	tables = {}
+	table_structure_data = table_regex.findall(contents)
+	for tsd in table_structure_data:
+		fields = re.split(",\n", tsd[2])
+		tables[tsd[1]] = {}
+		tables[tsd[1]]['definition'] = tsd[0]
+		tables[tsd[1]]['fields'] = {}
+		for field in fields:
+			column     = get_column_field(field.strip())
+			index      = get_index_field(field.strip())
+			constraint = get_constraint(field.strip())
+			if column:
+				tables[tsd[1]]['fields'][column[1]] = {}
+				tables[tsd[1]]['fields'][column[1]]['description'] = column[0]
+				tables[tsd[1]]['fields'][column[1]]['name'] = column[1]
+			elif index:
+				index_type = index[1].lower().replace(' ' , '_')
+				index_field_alias_name = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
+				index_field_name = '%s' % index[2] if index[2] else '%s' % index[3]
+				tables[tsd[1]]['fields'][index_field_alias_name] = {}
+				tables[tsd[1]]['fields'][index_field_alias_name]['description'] = index[0]
+				tables[tsd[1]]['fields'][index_field_alias_name]['name'] = index_field_name
+				tables[tsd[1]]['fields'][index_field_alias_name]['index'] = index[1].lower()
+			elif constraint:
+				tables[tsd[1]]['fields'][column[1]] = {}
+				tables[tsd[1]]['fields'][column[1]]['description'] = column[0]
+				tables[tsd[1]]['fields'][column[1]]['name'] = column[1]
+				tables[tsd[1]]['fields'][column[1]]['constraint'] = None
+	return tables
+
 def diff_databases(db1, db2):
 	# this is messy
 	diffs = {}
@@ -113,7 +128,7 @@ def diff_databases(db1, db2):
 		else:
 			for field,val in attr['fields'].items():
 				# the indices get special treatment
-				if val['index']:
+				if 'index' in val:
 					desc = re.sub(re.compile("unique", re.I), "UNIQUE INDEX", re.sub(re.compile("key", re.I), "INDEX", val['description']))
 					if not db2[table]['fields'].has_key(field):
 						diffs['tables'][table]['indices'].append('ALTER TABLE `%s` ADD %s;' % (table, desc))
@@ -122,6 +137,8 @@ def diff_databases(db1, db2):
 						if val['description'] != db2[table]['fields'][field]['description']:
 							diffs['tables'][table]['indices'].append('ALTER TABLE `%s` DROP INDEX `%s`; ALTER TABLE `%s` ADD %s;' % (table, val['name'], table, desc))
 							diffs['mods'] += 1
+				elif 'constraint' in val:
+					pass
 				else:
 					if not db2[table]['fields'].has_key(field):
 						diffs['tables'][table]['add'].append(val['description'])

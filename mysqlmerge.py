@@ -86,31 +86,40 @@ def parse_sql(contents):
 	table_structure_data = table_regex.findall(contents)
 	for tsd in table_structure_data:
 		fields = re.split(",\n", tsd[2])
-		tables[tsd[1]] = {}
-		tables[tsd[1]]['definition'] = tsd[0]
-		tables[tsd[1]]['fields']     = {}
+		tables[tsd[1]] = {
+			'fields'     : {},
+			'definition' : tsd[0]
+		}
 		for field in fields:
 			column     = get_column_field(field.strip())
 			index      = get_index_field(field.strip())
 			constraint = get_constraint(field.strip())
 			if column:
-				tables[tsd[1]]['fields'][column[1]] = {}
-				tables[tsd[1]]['fields'][column[1]]['description'] = column[0]
-				tables[tsd[1]]['fields'][column[1]]['name']        = column[1]
+				tables[tsd[1]]['fields'][column[1]] = {
+					'name'        : column[1],
+					'description' : column[0],
+				}
 			elif index:
 				index_type = index[1].lower().replace(' ' , '_')
+				# because indices can have the same as columns...
+				# and indices can have aliases themselves, example:
+				# KEY `name` (`full_name`)
+				# or it could be something likes this:
+				# KEY (`name`)
 				index_field_alias = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
 				index_field_name = '%s' % index[2] if index[2] else '%s' % index[3]
-				tables[tsd[1]]['fields'][index_field_alias] = {}
-				tables[tsd[1]]['fields'][index_field_alias]['description'] = index[0]
-				tables[tsd[1]]['fields'][index_field_alias]['name']        = index_field_name
-				tables[tsd[1]]['fields'][index_field_alias]['index']       = index[1]
+				tables[tsd[1]]['fields'][index_field_alias] = {
+					'name'        : index_field_name,
+					'index'       : index[1],
+					'description' : index[0]
+				}
 			elif constraint:
 				constraint_alias = 'constraint_%s' % constraint[1]
-				tables[tsd[1]]['fields'][constraint_alias] = {}
-				tables[tsd[1]]['fields'][constraint_alias]['description'] = constraint[0]
-				tables[tsd[1]]['fields'][constraint_alias]['name']        = constraint[3]
-				tables[tsd[1]]['fields'][constraint_alias]['constraint']  = constraint[2].upper()
+				tables[tsd[1]]['fields'][constraint_alias] = {
+					'name'        : constraint[3],
+					'constraint'  : constraint[2].upper(),
+					'description' : constraint[0]
+				}
 	return tables
 
 def diff_databases(db1, db2):

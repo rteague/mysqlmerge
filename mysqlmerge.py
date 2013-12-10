@@ -72,7 +72,7 @@ def get_index_field(field):
 
 def get_constraint(field):
 	constraint_regex = re.compile(
-		"^(constraint `([a-z_][a-z0-9_]+)` foreign key \(`[a-z_][a-z0-9_]+`\)"
+		"^(constraint `([a-z_][a-z0-9_]+)` ((?:primary|foreign) key) \(`([a-z_][a-z0-9_]+)`\)"
 		" references `[a-z_][a-z0-9_]+` \(`[a-z_][a-z0-9_]+`\)(?: on delete .*)?)$", re.I
 	)
 	constraint_match = constraint_regex.match(field)
@@ -99,23 +99,24 @@ def parse_sql(contents):
 				tables[tsd[1]]['fields'][column[1]]['name']        = column[1]
 			elif index:
 				index_type = index[1].lower().replace(' ' , '_')
-				index_field_alias_name = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
+				index_field_alias = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
 				index_field_name = '%s' % index[2] if index[2] else '%s' % index[3]
-				tables[tsd[1]]['fields'][index_field_alias_name] = {}
-				tables[tsd[1]]['fields'][index_field_alias_name]['description'] = index[0]
-				tables[tsd[1]]['fields'][index_field_alias_name]['name']        = index_field_name
-				tables[tsd[1]]['fields'][index_field_alias_name]['index']       = index[1].lower()
+				tables[tsd[1]]['fields'][index_field_alias] = {}
+				tables[tsd[1]]['fields'][index_field_alias]['description'] = index[0]
+				tables[tsd[1]]['fields'][index_field_alias]['name']        = index_field_name
+				tables[tsd[1]]['fields'][index_field_alias]['index']       = index[1]
 			elif constraint:
-				tables[tsd[1]]['fields'][constraint[1]] = {}
-				tables[tsd[1]]['fields'][constraint[1]]['description'] = constraint[0]
-				tables[tsd[1]]['fields'][constraint[1]]['name']        = constraint[1]
-				tables[tsd[1]]['fields'][constraint[1]]['constraint']  = constraint[1]
+				constraint_alias = 'constraint_%s' % constraint[1]
+				tables[tsd[1]]['fields'][constraint_alias] = {}
+				tables[tsd[1]]['fields'][constraint_alias]['description'] = constraint[0]
+				tables[tsd[1]]['fields'][constraint_alias]['name']        = constraint[3]
+				tables[tsd[1]]['fields'][constraint_alias]['constraint']  = constraint[2].upper()
 	return tables
 
 def diff_databases(db1, db2):
 	# this is messy
 	diffs = {}
-	diffs['adds'] = 0; diffs['mods'] = 0; diffs['drops']  = 0
+	diffs['adds'] = 0; diffs['mods'] = 0; diffs['drops'] = 0
 	diffs['tables'] = {}
 	for table,attr in db1.items():
 		# check if we've spotted a difference in tables
@@ -142,8 +143,11 @@ def diff_databases(db1, db2):
 						diffs['tables'][table]['constraints'].append('ALTER TABLE `%s` ADD %s;' % (table, val['description']))
 						diffs['adds'] += 1
 					else:
+						drop_noun = '%s `%s`' % (val['constraint'], val['name'])
+						if re.match("^primary key", val['constraint'], re.I):
+							drop_noun = 'PRIMARY KEY'
 						if val['description'] != db2[table]['fields'][field]['description']:
-							diffs['tables'][table]['constraints'].append('ALTER TABLE `%s` DROP FOREIGN KEY `%s`; ALTER TABLE `%s` ADD %s;' % (table, val['name'], table, val['description']))
+							diffs['tables'][table]['constraints'].append('ALTER TABLE `%s` DROP %s; ALTER TABLE `%s` ADD %s;' % (table, drop_noun, table, val['description']))
 							diffs['mods'] += 1
 				else:
 					if not db2[table]['fields'].has_key(field):

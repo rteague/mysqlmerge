@@ -50,6 +50,12 @@ def get_mysqldumped_contents(database):
 	db.close()
 	return sql_contents
 
+def is_auto_increment(column):
+	auto_increment_regex = re.compile("auto_increment", re.I)
+	if auto_increment_regex.search(column):
+		return True
+	return False
+
 def get_column_field(field):
 	column_field_regex = re.compile(
 		"^(`([a-z0-9_]+)`"
@@ -80,6 +86,9 @@ def get_constraint(field):
 		return constraint_match.groups()
 	return None
 
+def match_indices_columns(index):
+	pass
+
 def parse_sql(contents):
 	table_regex = re.compile("(create table *`([a-z0-9_]+)` *\(\s*([^;]+)\)[^;]+;)", re.I)
 	tables = {}
@@ -87,8 +96,9 @@ def parse_sql(contents):
 	for tsd in table_structure_data:
 		fields = re.split(",\n", tsd[2])
 		tables[tsd[1]] = {
-			'fields'     : {},
-			'definition' : tsd[0]
+			'fields'          : {},
+			'definition'      : tsd[0],
+			'has_primary_key' : False
 		}
 		for field in fields:
 			column     = get_column_field(field.strip())
@@ -96,8 +106,9 @@ def parse_sql(contents):
 			constraint = get_constraint(field.strip())
 			if column:
 				tables[tsd[1]]['fields'][column[1]] = {
-					'name'        : column[1],
-					'description' : column[0],
+					'name'           : column[1],
+					'description'    : column[0],
+					'auto_increment' : is_auto_increment(column[0])
 				}
 			elif index:
 				index_type = index[1].lower().replace(' ' , '_')
@@ -111,13 +122,15 @@ def parse_sql(contents):
 				tables[tsd[1]]['fields'][index_field_alias] = {
 					'name'        : index_field_name,
 					'index'       : index[1],
-					'description' : index[0]
+					'columns'     : None,
+					'description' : index[0],
 				}
 			elif constraint:
 				constraint_alias = 'constraint_%s' % constraint[1]
 				tables[tsd[1]]['fields'][constraint_alias] = {
 					'name'        : constraint[3],
 					'constraint'  : constraint[2].upper(),
+					'columns'     : None,
 					'description' : constraint[0]
 				}
 	return tables
@@ -128,16 +141,19 @@ def diff_databases(db1, db2):
 	diffs['adds'] = 0; diffs['mods'] = 0; diffs['drops'] = 0
 	diffs['tables'] = {}
 	for table,attr in db1.items():
-		# check if we've spotted a difference in tables
-		diffs['tables'][table] = {}
-		diffs['tables'][table]['add']   = []; diffs['tables'][table]['modify']      = []
-		diffs['tables'][table]['drop']  = []; diffs['tables'][table]['indices']     = []
-		diffs['tables'][table]['table'] = []; diffs['tables'][table]['constraints'] = []
+		# alter table actions: add, modify, drop
+		# 'table' in the list is designated for the: create table `tablename`; syntax
+		# 'indices' are for handling any type of index field
+		# 'constraints' are for handling any type of explicit declarations of key constraints
+		diffs['tables'][table] = {
+			'add' : [], 'modify' : [], 'drop' : [], 'indices' : [], 'table' : [], 'constraints' : []
+		}
 		if not db2.has_key(table):
+			# if the table doesn't exist at all, copy the entire definition
 			diffs['tables'][table]['table'].append(attr['definition'])
 		else:
+			# check if we've spotted a difference in tables
 			for field,val in attr['fields'].items():
-				# the indices get special treatment
 				if 'index' in val:
 					desc = re.sub(re.compile("unique", re.I), "UNIQUE INDEX", re.sub(re.compile("key", re.I), "INDEX", val['description']))
 					if not db2[table]['fields'].has_key(field):
@@ -177,6 +193,7 @@ def write_table_actions(table, action, data):
 		if action == 'index' or action == 'indices' or action == 'table' or action == 'constraints':
 			for i in xrange(0, data_len): print data[action][i]
 		else:
+			# clustering column-field adds, modifies, and drops
 			print 'ALTER TABLE `%s`' % table,
 			if data_len > 1:
 				print '%s(' % sql_action_keyword
@@ -184,7 +201,6 @@ def write_table_actions(table, action, data):
 					print '\t%s,' % data[action][i] if i + 1 != data_len else '\t%s' % data[action][i]
 				print ');'
 			else: print '%s %s;' % (sql_action_keyword, data[action][0])
-				
 
 def write_sql(diffs):
 	print '\n-- Additions %d, Modifications %d, Drops %d; across all tables\n' % (diffs['adds'], diffs['mods'], diffs['drops']),

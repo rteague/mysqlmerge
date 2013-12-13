@@ -58,7 +58,7 @@ def is_auto_increment(column):
 
 def get_column_field(field):
 	column_field_regex = re.compile(
-		"^(`([a-z0-9_]+)`"
+		"^(`([a-z_][a-z0-9_]+)`"
 		" [a-z]+\([0-9]{1,3}\).*)", re.I
 	)
 	column_field_match = column_field_regex.match(field)
@@ -69,7 +69,7 @@ def get_column_field(field):
 def get_index_field(field):
 	key_field_regex = re.compile(
 		"^((?:((?:primary|foreign)?(?: ?key))?|(?:unique|index|fulltext))"
-		" *(?:(?:`([a-z0-9_]+)`)? *(?:\((?:`([a-z0-9_]+)`)(?:(?: *, *)?(?:`[a-z0-9_]+`)(?: *, *)?)*\)))),?$", re.I
+		" *(?:(?:`([a-z_][-a-z0-9_]+)`)? *(?:\((?:`([a-z_][a-z0-9_]+)`)(?:(?: *, *)?(?:`[a-z_][a-z0-9_]+`)(?: *, *)?)*\)))),?$", re.I
 	)
 	key_field_match = key_field_regex.match(field)
 	if key_field_match:
@@ -86,8 +86,11 @@ def get_constraint(field):
 		return constraint_match.groups()
 	return None
 
-def match_indices_columns(index):
-	pass
+def match_indices_columns(index_desc):
+	key_field_regex = re.compile("\(([^(]+)\)", re.I)
+	mapped_columns = key_field_regex.search(field)
+	data = tuple(re.split(",", mapped_columns.group(1).replace('`', '').replace(' ', '')))
+	return dict(zip(data, tuple([None for x in range(len(data))])))
 
 def parse_sql(contents):
 	table_regex = re.compile("(create table *`([a-z0-9_]+)` *\(\s*([^;]+)\)[^;]+;)", re.I)
@@ -96,9 +99,9 @@ def parse_sql(contents):
 	for tsd in table_structure_data:
 		fields = re.split(",\n", tsd[2])
 		tables[tsd[1]] = {
-			'fields'          : {},
-			'definition'      : tsd[0],
-			'has_primary_key' : False
+			'fields'      : {},
+			'definition'  : tsd[0],
+			'primary_key' : None
 		}
 		for field in fields:
 			column     = get_column_field(field.strip())
@@ -122,9 +125,11 @@ def parse_sql(contents):
 				tables[tsd[1]]['fields'][index_field_alias] = {
 					'name'        : index_field_name,
 					'index'       : index[1],
-					'columns'     : None,
+					'columns'     : match_indices_columns(index[0]),
 					'description' : index[0],
 				}
+				if index_type == 'primary key':
+					tables[tsd[1]]['primary_key'] = index_field_name
 			elif constraint:
 				constraint_alias = 'constraint_%s' % constraint[1]
 				tables[tsd[1]]['fields'][constraint_alias] = {
@@ -148,6 +153,8 @@ def diff_databases(db1, db2):
 		diffs['tables'][table] = {
 			'add' : [], 'modify' : [], 'drop' : [], 'indices' : [], 'table' : [], 'constraints' : []
 		}
+		# capture the primary key for reference
+		primary_key = db2[table]['primary_key']
 		if not db2.has_key(table):
 			# if the table doesn't exist at all, copy the entire definition
 			diffs['tables'][table]['table'].append(attr['definition'])
@@ -157,7 +164,14 @@ def diff_databases(db1, db2):
 				if 'index' in val:
 					desc = re.sub(re.compile("unique", re.I), "UNIQUE INDEX", re.sub(re.compile("key", re.I), "INDEX", val['description']))
 					if not db2[table]['fields'].has_key(field):
-						diffs['tables'][table]['indices'].append('ALTER TABLE `%s` ADD %s;' % (table, desc))
+						if primary_key is not None:
+							drop_auto_increment = ''
+							if db2[table]['fields'][primary_key]['auto_increment']:
+								auto_increment_regex = re.compile("auto_increment", re.I)
+								drop_auto_increment = 'ALTER TABLE `%s` MODIFY %s; ' % (table, re.sub(auto_increment_regex, db2[table]['fields'][primary_key]['description']))
+							diffs['tables'][table]['indices'].append('%sALTER TABLE `%s` DROP PRIMARY KEY;' % (table, primary_key, drop_auto_increment))
+						else:
+							diffs['tables'][table]['indices'].append('ALTER TABLE `%s` ADD %s;' % (table, desc))
 						diffs['adds'] += 1
 					else:
 						if val['description'] != db2[table]['fields'][field]['description']:

@@ -69,7 +69,7 @@ def get_column_field(field):
 def get_index_field(field):
 	key_field_regex = re.compile(
 		"^((?:((?:primary|foreign)?(?: ?key))?|(?:unique|index|fulltext))"
-		" *(?:(?:`([a-z_][-a-z0-9_]+)`)? *(?:\((?:`([a-z_][a-z0-9_]+)`)(?:(?: *, *)?(?:`[a-z_][a-z0-9_]+`)(?: *, *)?)*\)))),?$", re.I
+		" *(?:`([a-z_][-a-z0-9_]+)`)? \(([^(]+)\))$", re.I
 	)
 	key_field_match = key_field_regex.match(field)
 	if key_field_match:
@@ -86,11 +86,8 @@ def get_constraint(field):
 		return constraint_match.groups()
 	return None
 
-def match_indices_columns(index_desc):
-	key_field_regex = re.compile("\(([^(]+)\)", re.I)
-	mapped_columns = key_field_regex.search(field)
-	data = tuple(re.split(",", mapped_columns.group(1).replace('`', '').replace(' ', '')))
-	return dict(zip(data, tuple([None for x in range(len(data))])))
+def get_indexed_cols(s):
+	return tuple(s.replace('`', '').replace(' ', '').split(','))
 
 def parse_sql(contents):
 	table_regex = re.compile("(create table *`([a-z0-9_]+)` *\(\s*([^;]+)\)[^;]+;)", re.I)
@@ -120,22 +117,24 @@ def parse_sql(contents):
 				# KEY `name` (`full_name`)
 				# or it could be something likes this:
 				# KEY (`name`)
-				index_field_alias = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, index[3])
-				index_field_name = '%s' % index[2] if index[2] else '%s' % index[3]
+				indexed_columns = get_indexed_cols(index[3])
+				index_field_alias = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, indexed_columns[3])
+				index_field_name = '%s' % index[2] if index[2] else '%s' % indexed_columns[0]
 				tables[tsd[1]]['fields'][index_field_alias] = {
 					'name'        : index_field_name,
 					'index'       : index[1],
-					'columns'     : match_indices_columns(index[0]),
+					'columns'     : indexed_columns,
 					'description' : index[0],
 				}
 				if index_type == 'primary key':
 					tables[tsd[1]]['primary_key'] = index_field_name
 			elif constraint:
+				indexed_columns = get_indexed_cols(constraint[3])
 				constraint_alias = 'constraint_%s' % constraint[1]
 				tables[tsd[1]]['fields'][constraint_alias] = {
 					'name'        : constraint[3],
 					'constraint'  : constraint[2].upper(),
-					'columns'     : None,
+					'columns'     : indexed_columns,
 					'description' : constraint[0]
 				}
 	return tables

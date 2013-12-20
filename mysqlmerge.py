@@ -78,7 +78,7 @@ def get_index_field(field):
 
 def get_constraint(field):
 	constraint_regex = re.compile(
-		"^(constraint `([a-z_][a-z0-9_]+)` ((?:primary|foreign) key) \(`([a-z_][a-z0-9_]+)`\)"
+		"^(constraint `([a-z_][a-z0-9_]+)` ((?:primary|foreign) key) *(?:`[a-z_][-a-z0-9_]+`)? *\(([^(]+)\)"
 		" references `[a-z_][a-z0-9_]+` \(`[a-z_][a-z0-9_]+`\)(?: on delete .*)?)$", re.I
 	)
 	constraint_match = constraint_regex.match(field)
@@ -110,6 +110,8 @@ def parse_sql(contents):
 					'description'    : column[0],
 					'auto_increment' : is_auto_increment(column[0])
 				}
+			elif index or constraint:
+				
 			elif index:
 				index_type = index[1].lower().replace(' ' , '_')
 				# because indices can have the same as columns...
@@ -121,22 +123,26 @@ def parse_sql(contents):
 				index_field_alias = '%s_%s' % (index_type, index[2]) if index[2] else '%s_%s' % (index_type, indexed_columns[3])
 				index_field_name = '%s' % index[2] if index[2] else '%s' % indexed_columns[0]
 				tables[tsd[1]]['fields'][index_field_alias] = {
-					'name'        : index_field_name,
-					'index'       : index[1],
-					'columns'     : indexed_columns,
-					'description' : index[0],
+					'name'            : index_field_name,
+					'index'           : index[1],
+					'indexed_columns' : indexed_columns,
+					'description'     : index[0],
 				}
-				if index_type == 'primary key':
-					tables[tsd[1]]['primary_key'] = index_field_name
+				if index_type == 'primary_key':
+					tables[tsd[1]]['primary_key'] = index_field_alias
 			elif constraint:
+				# dealing with explicit contraints
+				index_type = constraint[2].lower().replace(' ' , '_')
 				indexed_columns = get_indexed_cols(constraint[3])
 				constraint_alias = 'constraint_%s' % constraint[1]
 				tables[tsd[1]]['fields'][constraint_alias] = {
-					'name'        : constraint[3],
-					'constraint'  : constraint[2].upper(),
-					'columns'     : indexed_columns,
-					'description' : constraint[0]
+					'name'            : constraint[3],
+					'constraint'      : constraint[2].upper(),
+					'indexed_columns' : indexed_columns,
+					'description'     : constraint[0]
 				}
+				if index_type == 'primary_key':
+					tables[tsd[1]]['primary_key'] = constraint_alias
 	return tables
 
 def diff_databases(db1, db2):
@@ -165,10 +171,10 @@ def diff_databases(db1, db2):
 					if not db2[table]['fields'].has_key(field):
 						if primary_key is not None:
 							drop_auto_increment = ''
-							if db2[table]['fields'][primary_key]['auto_increment']:
-								auto_increment_regex = re.compile("auto_increment", re.I)
-								drop_auto_increment = 'ALTER TABLE `%s` MODIFY %s; ' % (table, re.sub(auto_increment_regex, db2[table]['fields'][primary_key]['description']))
-							diffs['tables'][table]['indices'].append('%sALTER TABLE `%s` DROP PRIMARY KEY;' % (table, primary_key, drop_auto_increment))
+							for col in val['indexed_columns']:
+								if db2[table]['fields'][primary_key]['auto_increment']:
+									drop_auto_increment = 'ALTER TABLE `%s` MODIFY %s; ' % (table, re.sub("auto_increment", db2[table]['fields'][primary_key]['description'], flags = re.I))
+								diffs['tables'][table]['indices'].append('%sALTER TABLE `%s` DROP PRIMARY KEY;' % (table, primary_key, drop_auto_increment))
 						else:
 							diffs['tables'][table]['indices'].append('ALTER TABLE `%s` ADD %s;' % (table, desc))
 						diffs['adds'] += 1

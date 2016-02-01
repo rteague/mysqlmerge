@@ -24,7 +24,7 @@
 ### How to
 
 mysqlmerge only works with table structures, not the data (that would get freaking crazy).  Second, it only works with, for now,
-the *clean* formatted code that mysqldump would out put.  We'll continue to update mysqmerge to handle any format
+the *clean* formatted code that mysqldump would out put.  I'll continue to update mysqmerge to handle any format
 of "free hand" mysql code.
 
 Not using the -i or --input-files options means you are attempting to connect to a datatabase

@@ -81,6 +81,6 @@ optional arguments:
                       with a database connection
   -v, --verbose       a print out of what the hell is going on...
 
-MySQL Merge v0.0.1 Copyright (c) 2013 Pear
+MySQL Merge v0.0.1 Copyright (c) 2013-2016 Rashaud Teague
 ```
 

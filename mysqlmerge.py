@@ -7,7 +7,7 @@
 ##
 
 import argparse, re, sys, subprocess, os, os.path, xml.etree.ElementTree as ET, time
-import mdb.abstract
+import mysql.connector
 
 MYSQLMERGE_VERSION = '0.0.1'
 MYSQLMERGE_CONFIG_PATH = '%s/.mysqlmerge' % os.environ['HOME']
@@ -110,8 +110,6 @@ def parse_sql(contents):
 					'description'    : column[0],
 					'auto_increment' : is_auto_increment(column[0])
 				}
-			elif index or constraint:
-				
 			elif index:
 				index_type = index[1].lower().replace(' ' , '_')
 				# because indices can have the same as columns...

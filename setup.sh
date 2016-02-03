@@ -4,14 +4,15 @@
 
 function installp
 {
-	# add install code
-	
+	cp ${mysqlmerge_bin[0]} ${mysqlmerge_bin[1]}
+   chmod a+x ${mysqlmerge_bin[1]}
+   
 	return 0
 }
 
 function uninstallp
 {
-	# add uninstall code
+	rm ${mysqlmerge_bin[1]}
 	
 	return 0
 }
@@ -22,7 +23,7 @@ function __main__
 	declare -r USAGE="usage: bash setup.sh install | uninstall"
 	
 	# add any other constants or setup variables
-   local _mysqlmerge_bin=(mysqlmerge.py /usr/local/bin/mysqlmerge)
+   local mysqlmerge_bin=(mysqlmerge.py /usr/local/bin/mysqlmerge)
    
 	if [ $# -eq 0 ]; then
 		echo $USAGE

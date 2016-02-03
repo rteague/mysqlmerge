@@ -6,7 +6,7 @@ function installp
 {
 	cp ${mysqlmerge_bin[0]} ${mysqlmerge_bin[1]}
    chmod a+x ${mysqlmerge_bin[1]}
-   
+
 	return 0
 }
 

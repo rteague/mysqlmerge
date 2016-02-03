@@ -16,12 +16,12 @@
 
 ### Installation
 
-* Within the mysqlmerge package directory run: `sudo ./install.sh`
-* This just moves the mysqlmerge.py file to the machine's /usr/bin directory (/usr/bin/mysqlmerge)
+* Within the mysqlmerge package directory run: `sudo bash setup.sh install`
+* This just moves the mysqlmerge.py file to the machine's /usr/local/bin directory (/usr/local/bin/mysqlmerge)
 
 ### Uninstallation
 
-* Within the mysqlmerge package directory run: `sudo ./uninstall.sh`
+* Within the mysqlmerge package directory run: `sudo bash setup.sh uninstall`
 
 ### How to
 

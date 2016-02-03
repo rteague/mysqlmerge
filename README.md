@@ -1,11 +1,13 @@
 # MySQL Merge v0.0.1
 
+### Notices
+
+* This is still under developments
 
 ### Requirements
 
 * Python 2.7.*
 * mysql.connector
-* mdb.abstract
 * Mac OSX or Linux... get that Windows stuff outta herrr
 
 ### License
